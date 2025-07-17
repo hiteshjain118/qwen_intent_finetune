@@ -13,7 +13,6 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-import os
 from huggingface_hub import snapshot_download
 
 def run_command(command, description):
@@ -114,6 +113,37 @@ def download_sgd_dataset(dataset_dir):
     
     return success
 
+def install_requirements(requirements_file="requirements.txt"):
+    """
+    Install Python packages from requirements.txt file.
+    
+    Args:
+        requirements_file (str): Path to requirements.txt file (default: "requirements.txt")
+    
+    Returns:
+        bool: True if installation successful, False otherwise
+    """
+    print("\n" + "="*60)
+    print("INSTALLING REQUIREMENTS")
+    print("="*60)
+    
+    # Check if requirements file exists
+    if not os.path.exists(requirements_file):
+        print(f"❌ Requirements file not found: {requirements_file}")
+        return False
+    
+    print(f"📦 Installing packages from {requirements_file}...")
+    
+    # Install requirements using pip
+    success = run_command(f"pip install -r {requirements_file}", "Installing Python requirements")
+    
+    if success:
+        print("✅ Requirements installed successfully!")
+    else:
+        print("❌ Failed to install requirements")
+    
+    return success
+
 def verify_downloads(model_dir, dataset_dir):
     """
     Verify that both model and dataset were downloaded successfully.
@@ -159,23 +189,33 @@ def verify_downloads(model_dir, dataset_dir):
     
     return results
 
-def initialize_environment(check_directory=True, model_id=None, model_local_dir=None, dataset_dir=None):
+def initialize_environment(check_directory=True, model_id=None, model_local_dir=None, dataset_dir=None, install_reqs=True, requirements_file="requirements.txt"):
     """
-    Initialize the environment by downloading model and dataset.
+    Initialize the environment by installing requirements and downloading model and dataset.
     
     Args:
         check_directory (bool): Whether to check if running from finetune directory
+        model_id (str): Hugging Face model ID
+        model_local_dir (str): Local directory to save the model
+        dataset_dir (str): Local directory name for the dataset
+        install_reqs (bool): Whether to install requirements (default: True)
+        requirements_file (str): Path to requirements.txt file (default: "requirements.txt")
     
     Returns:
         dict: Dictionary with initialization results
     """
     print("🚀 GPU Initialization for Qwen1.5 Intent Classification")
-    print("This will download the Qwen 1.5B model and SGD dataset")
+    print("This will install requirements and download the Qwen 1.5B model and SGD dataset")
     
     # Check if we're in the right directory
     if check_directory and not os.path.exists("finetune/qwen_intent_finetune.py"):
         print("❌ Please run this from the finetune directory")
         return {"success": False, "error": "Wrong directory"}
+    
+    # Install requirements first
+    reqs_success = True
+    if install_reqs:
+        reqs_success = install_requirements(requirements_file)
     
     # Download model
     model_success = download_qwen_model(model_id, model_local_dir)
@@ -191,7 +231,7 @@ def initialize_environment(check_directory=True, model_id=None, model_local_dir=
     print("SUMMARY")
     print("="*60)
     
-    all_success = model_success and dataset_success
+    all_success = reqs_success and model_success and dataset_success
     
     if all_success:
         print("🎉 All downloads completed successfully!")
@@ -200,7 +240,9 @@ def initialize_environment(check_directory=True, model_id=None, model_local_dir=
         print("2. Or run evaluation: python evaluate_accuracy.py")
         print("3. Or run inference: python inference.py")
     else:
-        print("⚠️  Some downloads failed. Please check the errors above.")
+        print("⚠️  Some operations failed. Please check the errors above.")
+        if not reqs_success:
+            print("   - Requirements installation failed")
         if not model_success:
             print("   - Model download failed")
         if not dataset_success:
@@ -208,6 +250,7 @@ def initialize_environment(check_directory=True, model_id=None, model_local_dir=
     
     return {
         "success": all_success,
+        "requirements_installed": reqs_success,
         "model_downloaded": model_success,
         "dataset_downloaded": dataset_success,
         "verification": verification_results
@@ -217,6 +260,8 @@ if __name__ == "__main__":
     initialize_environment(
         check_directory=True, 
         model_id="Qwen/Qwen1.5-1.8B", 
-        model_local_dir="./qwen_model_1.5B_1", 
-        dataset_dir="dstc8-schema-guided-dialogue_1"
+        model_local_dir="./qwen_model_1.5B_3", 
+        dataset_dir="dstc8-schema-guided-dialogue_3",
+        install_reqs=True,
+        requirements_file="finetune/requirements.txt"
     )
